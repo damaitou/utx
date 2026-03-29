@@ -1,6 +1,7 @@
 
 use std::io::{Write};
 use std::fs::File;
+use xxhash_rust::xxh3::Xxh3;
 use std::net::{SocketAddr, UdpSocket, IpAddr, TcpStream};
 use std::os::raw::{c_void, c_char, c_int};
 use std::os::unix::io::AsRawFd;
@@ -767,6 +768,9 @@ struct FileRuntime {
     //data_cache
     cache: Vec<u8>,
     cache_len: usize, //how many bytes stored in cache
+    //xxh3 hasher for file integrity check
+    hasher: Option<Xxh3>,
+    file_hash: Option<String>,
 }
 
 impl FileRuntime {
@@ -799,6 +803,8 @@ impl FileRuntime {
             status: context::RUNNING,
             cache: vec![0;1024*1024],
             cache_len: 0,
+            hasher: None,
+            file_hash: None,
         };
 
         Ok(frt)
@@ -845,6 +851,8 @@ impl FileRuntime {
         self.file_size = 0;
         self.utx_lost = 0;
         self.cache_len = 0;
+        self.hasher = None;
+        self.file_hash = None;
     }
 
     fn reset_and_cleanup_unfinished_file(&mut self, has_tail_packet:bool) {
@@ -1120,6 +1128,8 @@ impl UtxRuntime {
             frt.file_name = Some(rel_file);
             frt.file = Some(f);
             frt.utx_seq = utx.seq as i32;
+            frt.hasher = Some(Xxh3::new());  // 初始化 XXH3 哈希计算器
+            frt.file_hash = None;
 
             info!("文件通道{}接收到新文件{},seq={}", utx.channel, frt.file_name.as_ref().unwrap(), utx.seq);
         }
@@ -1141,6 +1151,11 @@ impl UtxRuntime {
         let slice = unsafe {std::slice::from_raw_parts(utx.payload, utx.payload_size)};
 //println!("seq={},content={}", utx.seq, String::from_utf8_lossy(&slice));
 
+        // 更新哈希值（如果 hasher 已初始化）
+        if let Some(ref mut hasher) = frt.hasher {
+            hasher.update(&slice[offset..]);
+        }
+
         if utx.tail == 0 {
             frt.append_file_cache(&slice[offset..])?;
         }
@@ -1154,13 +1169,20 @@ impl UtxRuntime {
         }
 
         if utx.tail != 0 {
-            info!("文件通道{}接收文件'{}'完毕,丢包={}", 
+            // 计算最终哈希值
+            let file_hash = frt.hasher.take()
+                .map(|h| format!("{:016x}", h.digest()))
+                .unwrap_or_default();
+            frt.file_hash = Some(file_hash.clone());
+
+            info!("文件通道{}接收文件'{}'完毕,丢包={},xxh3={}", 
                 utx.channel, 
                 match frt.file_name.as_ref() { 
                     Some(s) => s.as_str(), 
                     None => "",
                 },
-                frt.utx_lost, 
+                frt.utx_lost,
+                file_hash,
             );
 
             if frt.utx_lost != 0 {

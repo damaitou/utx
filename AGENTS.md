@@ -167,6 +167,7 @@ This project was originally developed in 2021 and required updates to compile wi
 | `des` | 0.3.0 | removed | Crate yanked, replaced with OpenSSL |
 | `block-cipher-trait` | 0.6 | removed | All versions yanked |
 | `generic-array` | 0.12.3 | removed | No longer needed |
+| `xxhash-rust` | - | 0.8 | Added XXH3 hashing for file integrity check |
 
 ### Code Changes
 
@@ -176,6 +177,17 @@ This project was originally developed in 2021 and required updates to compile wi
 4. **`src/c/cutx.c`**: Added `static` to `inline` functions (`get_file_size`)
 5. **`src/c/sutx.c`**: Added `static` to `inline` functions (`guess_block_size`, `handle_frame`)
 6. **`src/lib/audit.rs`**: Added `mysql::prelude::*` import
+7. **`src/binprog/ftp.rs`**: Added FileExtChecker filter in `ftp_list()` and `ftp_mlsd()` functions
+8. **`src/binprog/es.rs`**: Added XXH3 file hash calculation in RX file receiving process
+
+### XXH3 File Hash (RX Side)
+
+Added real-time file hash calculation during file reception in `es` (RX side):
+
+- **Algorithm**: XXH3 (extremely fast, non-cryptographic hash)
+- **Purpose**: File integrity verification
+- **Implementation**: Streaming hash updated with each packet, final hash computed on tail packet
+- **Log Output**: `INFO 文件通道{}接收文件'{}'完毕,丢包={},xxh3={}`
 
 ### Build Configuration
 
