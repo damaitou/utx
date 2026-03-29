@@ -35,17 +35,17 @@ rand_core = "0.6"
 rand = "0.8"
 md5 = "0.6.1"
 #time = "0.1.42"
-time = { version = "0.3", features = ["local-offset", "macros"] }
+time = "0.1.45"
 #mysql = "17"
-mysql = "23"
+mysql = "17"
 async-std = "1.6.0"
 #async-std = "1.12"
-des = "0.3.0"
+#des = "0.3.0"
 #des = "0.8.0"
-block-cipher-trait = "0.6"
-generic-array = "0.12.3"
+#block-cipher-trait = "0.6"
+#generic-array = "0.12.3"
 #socket2 = "0.3.11"
-socket2 = "0.5"
+socket2 = "0.3"
 regex = "0.1"
 #sctp = "0.1"
 #openssl = "0.10"
@@ -59,8 +59,8 @@ rocket = { version = "0.5.0-rc.2", features = ["json"] }
 
 [profile.release]
 opt-level = 3     # Optimize for size.
-lto = true          # Enable Link Time Optimization
-codegen-units = 1   # Reduce number of codegen units to increase optimizations.
+#lto = true          # Enable Link Time Optimization (temporarily disabled due to ICE)
+codegen-units = 16   # Increase codegen units to avoid ICE
 #panic = 'abort'     # Abort on panic
 
 [lib]

@@ -31,7 +31,7 @@ UTX provides secure unidirectional data ferrying capabilities supporting:
 | `mio` (0.6) | Async I/O and event polling |
 | `rocket` (0.5.0-rc.2) | Web API framework |
 | `serde`/`serde_json` | Configuration and data serialization |
-| `mysql` (23) | Audit database connectivity |
+| `mysql` (17) | Audit database connectivity |
 | `openssl` (0.10) | Encryption (AES-128-CBC) |
 | `ssh2` | SFTP client functionality |
 | `inotify` | File system monitoring |
@@ -152,6 +152,35 @@ opt-level = 3        # Maximum optimization
 lto = true           # Link Time Optimization
 codegen-units = 1    # Single codegen unit for better optimization
 ```
+
+## 2025 Compatibility Fixes
+
+This project was originally developed in 2021 and required updates to compile with modern Rust toolchain (2025):
+
+### Dependency Version Adjustments
+
+| Dependency | Old Version | New Version | Reason |
+|------------|-------------|-------------|--------|
+| `time` | 0.3 | 0.1.45 | `get_time()` API removed in 0.3 |
+| `mysql` | 23 | 17 | `prepare()`/`prep_exec()` APIs changed |
+| `socket2` | 0.5 | 0.3 | `Domain::ipv4()` → `Domain::IPV4`, etc. |
+| `des` | 0.3.0 | removed | Crate yanked, replaced with OpenSSL |
+| `block-cipher-trait` | 0.6 | removed | All versions yanked |
+| `generic-array` | 0.12.3 | removed | No longer needed |
+
+### Code Changes
+
+1. **`src/lib/license.rs`**: Replaced DES encryption from `des` crate with OpenSSL's `symm::Cipher`
+2. **`src/binprog/aftpd.rs`**: Updated `rand::gen_range(a, b)` to `rand::gen_range(a..b)`
+3. **`src/binprog/agent_thread.rs`**: Fixed infinite loop return type issue
+4. **`src/c/cutx.c`**: Added `static` to `inline` functions (`get_file_size`)
+5. **`src/c/sutx.c`**: Added `static` to `inline` functions (`guess_block_size`, `handle_frame`)
+6. **`src/lib/audit.rs`**: Added `mysql::prelude::*` import
+
+### Build Configuration
+
+- Disabled `lto = true` in release profile due to Rust compiler ICE (Internal Compiler Error)
+- Set `codegen-units = 16` to reduce memory pressure during compilation
 
 ## Available Binaries
 

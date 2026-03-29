@@ -386,11 +386,13 @@ where
     W: Write,
 {
     let mut data_buf = DataBuf::new();
-    let mut written = 0;
+    let mut written = 0u64;
     loop {
         data_buf.read_from(reader)?;
         data_buf.write_to(writer)?;
-        written += data_buf.header.total_len;
+        written += data_buf.header.total_len as u64;
     }
+    #[allow(unreachable_code)]
+    Ok(written)
 }
 

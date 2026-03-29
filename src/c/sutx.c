@@ -9,10 +9,10 @@
 static unsigned int rx_mtu = 1500;
 static unsigned int rx_buffer_size_mb = 640; //default to 640MB ring buffer size
 
-inline void handle_frame (struct sockaddr_ll *addr,
+static inline void handle_frame (struct sockaddr_ll *addr,
 		   char *l2content, char *l3content, struct UtxReceiver *ur, void *token);
 
-inline unsigned int guess_block_size() 
+static inline unsigned int guess_block_size() 
 {
     long sz = sysconf(_SC_PAGESIZE);
     if (sz == 4096) {
@@ -169,7 +169,7 @@ loop_on_available_packets(struct UtxReceiver *ur, void *token)
     return counter;
 }
 
-inline void
+static inline void
 handle_frame (
     struct sockaddr_ll *addr,
     char *l2content, 

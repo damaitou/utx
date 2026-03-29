@@ -228,7 +228,7 @@ init_ethhdr(struct ethhdr *eth, const unsigned char *tx_mac, const unsigned char
   eth->h_proto = htons(ETH_P_UTX);
 }
 
-inline uint64_t
+static inline uint64_t
 get_file_size(const char *filepath)
 {
 	struct stat st;

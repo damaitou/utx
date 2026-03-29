@@ -244,7 +244,7 @@ impl FtpSession {
         };
             
         for _i in 0..10 {
-            let port = rand::thread_rng().gen_range(port_min, port_max) as u16;
+            let port = rand::thread_rng().gen_range(port_min..port_max) as u16;
             let bind_addr = match cmd {
                 "PASV" => SocketAddr::new(self.pasv_ipv4_addr, port),
                 "EPSV" => match self.epsv_ipv6_addr {

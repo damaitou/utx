@@ -1,10 +1,11 @@
 
 use std::os::raw::c_int;
-use block_cipher_trait::BlockCipher;
-use generic_array::{GenericArray};
-use generic_array::typenum::{U8};
+//use block_cipher_trait::BlockCipher;
+//use generic_array::{GenericArray};
+//use generic_array::typenum::{U8};
 use serde::{Serialize, Deserialize};
 use std::io::{Result, Error, ErrorKind};
+use openssl::symm::{Cipher, Crypter, Mode};
 
 #[link(name = "utx", kind = "static")]
 extern "C" {
@@ -129,7 +130,7 @@ impl License {
     pub fn encode_string(src: &str) -> Result<String> {
         let key = License::get_hardware_uid()?;
         let dgst = md5::compute(key.as_bytes());
-        let mut inner_key = GenericArray::<u8,U8>::default();
+        let mut inner_key = [0u8; 8];
         //XOR the first 8 bytes and the last 8 bytes to construct a key
         for (i, &b) in dgst.0.iter().enumerate() {
             inner_key[i%8] = inner_key[i%8] ^ b;
@@ -141,12 +142,34 @@ impl License {
         buffer[0..src.len()].copy_from_slice(src.as_bytes());
         //println!("before encrypt:{:x?}",buffer);
 
-        let cipher = des::Des::new(&inner_key);
-        for i in 0..len/8 {
-            cipher.encrypt_block(GenericArray::from_mut_slice(&mut buffer[i*8..i*8+8]));
+        // OpenSSL DES ECB 加密
+        let cipher = Cipher::des_ecb();
+        let mut crypter = Crypter::new(cipher, Mode::Encrypt, &inner_key, None)
+            .map_err(|e| Error::new(ErrorKind::Other, format!("Crypter::new failed: {:?}", e)))?;
+        crypter.pad(false);
+        let mut encrypted = vec![0; len + cipher.block_size()];
+        let mut count = 0;
+        for chunk in buffer.chunks(8) {
+            crypter.update(chunk, &mut encrypted[count..count+8])
+                .map_err(|e| Error::new(ErrorKind::Other, format!("encrypt update failed: {:?}", e)))?;
+            count += 8;
         }
-        //println!("after encrypt:{:x?}",buffer);
-        Ok(License::base64_encode(&buffer))
+        crypter.finalize(&mut encrypted[count..])
+            .map_err(|e| Error::new(ErrorKind::Other, format!("encrypt finalize failed: {:?}", e)))?;
+        encrypted.truncate(len);
+
+        // 旧代码（使用 des crate）
+        //let mut inner_key = GenericArray::<u8,U8>::default();
+        //for (i, &b) in dgst.0.iter().enumerate() {
+        //    inner_key[i%8] = inner_key[i%8] ^ b;
+        //}
+        //let cipher = des::Des::new(&inner_key);
+        //for i in 0..len/8 {
+        //    cipher.encrypt_block(GenericArray::from_mut_slice(&mut buffer[i*8..i*8+8]));
+        //}
+
+        //println!("after encrypt:{:x?}",encrypted);
+        Ok(License::base64_encode(&encrypted))
     }
 
     pub fn decode_string(src: &str) -> Result<String> {
@@ -155,18 +178,40 @@ impl License {
 
         let key = License::get_hardware_uid()?;
         let dgst = md5::compute(key.as_bytes());
-        let mut inner_key = GenericArray::<u8,U8>::default();
+        let mut inner_key = [0u8; 8];
         for (i, &b) in dgst.0.iter().enumerate() {
             inner_key[i%8] = inner_key[i%8] ^ b;
         }
 
         //println!("inner_key.len()={}", inner_key.len());
-        let cipher = des::Des::new(&inner_key);
-        for i in 0..len/8 {
-            cipher.decrypt_block(GenericArray::from_mut_slice(&mut buffer[i*8..i*8+8]));
+
+        // OpenSSL DES ECB 解密
+        let cipher = Cipher::des_ecb();
+        let mut crypter = Crypter::new(cipher, Mode::Decrypt, &inner_key, None)
+            .map_err(|e| Error::new(ErrorKind::Other, format!("Crypter::new failed: {:?}", e)))?;
+        crypter.pad(false);
+        let mut decrypted = vec![0; len + cipher.block_size()];
+        let mut count = 0;
+        for i in (0..len).step_by(8) {
+            crypter.update(&buffer[i..i+8], &mut decrypted[count..count+8])
+                .map_err(|e| Error::new(ErrorKind::Other, format!("decrypt update failed: {:?}", e)))?;
+            count += 8;
         }
-        //println!("after decrypt:{:x?}",buffer);
-        Ok(String::from_utf8_lossy(&buffer[..len]).to_string())
+        crypter.finalize(&mut decrypted[count..])
+            .map_err(|e| Error::new(ErrorKind::Other, format!("decrypt finalize failed: {:?}", e)))?;
+        decrypted.truncate(len);
+
+        // 旧代码（使用 des crate）
+        //let mut inner_key = GenericArray::<u8,U8>::default();
+        //for (i, &b) in dgst.0.iter().enumerate() {
+        //    inner_key[i%8] = inner_key[i%8] ^ b;
+        //}
+        //let cipher = des::Des::new(&inner_key);
+        //for i in 0..len/8 {
+        //    cipher.decrypt_block(GenericArray::from_mut_slice(&mut buffer[i*8..i*8+8]));
+        //}
+        //println!("after decrypt:{:x?}",decrypted);
+        Ok(String::from_utf8_lossy(&decrypted[..len]).to_string())
     }
 
     pub fn encode_license(lic: &License) -> Result<String> {

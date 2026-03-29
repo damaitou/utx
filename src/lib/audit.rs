@@ -8,6 +8,7 @@ use std::time::Duration;
 use serde::{Serialize, Deserialize};
 use chrono::{Local};
 use log::{error, info, /*debug*/};
+use mysql::prelude::*;
 use crate::errors::*;
 use crate::util;
 
