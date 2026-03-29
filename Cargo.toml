@@ -1,0 +1,124 @@
+[package]
+name = "utx"
+version = "1.2.2"
+authors = ["damaitou"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[build-dependencies]
+cc = "1.0"
+chrono = "0.4"
+pkg-config = "0.3"
+
+[dependencies.inotify]
+version = "0.9.0"
+features = []
+
+[dependencies]
+libc = "0.2"
+mio = "0.6"
+#mio = "0.8"
+mio-extras = "2.0"
+serde = {version = "1.0.99", features = ["derive"]}
+serde_json = "1.0.40"
+bincode = "1.1.4"
+chrono = "0.4.7"
+lazy_static = "1.4.0"
+error-chain = "0.12.1"
+daemonize = "0.4.1"
+radix_trie = "0.1.5"
+log = "0.4.0"
+flexi_logger = "0.15"
+#rand_core = "0.5.1"
+rand_core = "0.6"
+#rand = "0.7.2"
+rand = "0.8"
+md5 = "0.6.1"
+#time = "0.1.42"
+time = { version = "0.3", features = ["local-offset", "macros"] }
+#mysql = "17"
+mysql = "23"
+async-std = "1.6.0"
+#async-std = "1.12"
+des = "0.3.0"
+#des = "0.8.0"
+block-cipher-trait = "0.6"
+generic-array = "0.12.3"
+#socket2 = "0.3.11"
+socket2 = "0.5"
+regex = "0.1"
+#sctp = "0.1"
+#openssl = "0.10"
+openssl = "0.10.76"
+base64 = "0.12"
+encoding = "0.2"
+docopt = "~1.1"
+ringbuf = "0.2"
+ssh2 = "0.9"
+rocket = { version = "0.5.0-rc.2", features = ["json"] }
+
+[profile.release]
+opt-level = 3     # Optimize for size.
+lto = true          # Enable Link Time Optimization
+codegen-units = 1   # Reduce number of codegen units to increase optimizations.
+#panic = 'abort'     # Abort on panic
+
+[lib]
+name = "mylib"
+path = "src/lib/lib.rs"
+
+#[[bin]]
+#name = "test"
+#path = "src/binprog/test.rs"
+
+#[[bin]]
+#name = "test_watch"
+#path = "src/binprog/test_watch.rs"
+
+#[[bin]]
+#name = "uproxy"
+#path = "src/binprog/uproxy.rs"
+
+#[[bin]]
+#name = "btx2"
+#path = "src/binprog/btx2.rs"
+
+[[bin]]
+name = "ds"
+path = "src/binprog/ds.rs"
+
+[[bin]]
+name = "es"
+path = "src/binprog/es.rs"
+
+#[[bin]]
+#name = "agent"
+#path = "src/binprog/agent.rs"
+
+[[bin]]
+name = "aftpd"
+path = "src/binprog/aftpd.rs"
+
+###[[bin]]
+###name = "genkey"
+###path = "src/binprog/genkey.rs"
+
+[[bin]]
+name = "fpull"
+path = "src/binprog/fpull.rs"
+
+#[[bin]]
+#name = "fpull2"
+#path = "src/binprog/fpull2.rs"
+
+#[[bin]]
+#name = "ctrl"
+#path = "src/binprog/ctrl.rs"
+
+#[[bin]]
+#name = "lic"
+#path = "src/binprog/lic.rs"
+
+#[[bin]]
+#name = "udpperf"
+#path = "src/binprog/udpperf.rs"

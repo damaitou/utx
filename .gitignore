@@ -1,0 +1,30 @@
+# Rust
+target/
+Cargo.lock
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temporary files
+*.tmp
+*.bak
+~*
+
+# Compiled C objects
+*.o
+*.a
+src/c/a.out
+src/c/hwid
+src/c/magic
+src/c/packet
+
+# Backup
+src_backup/
+*.tar.gz
