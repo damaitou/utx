@@ -1,6 +1,6 @@
 [package]
 name = "utx"
-version = "1.2.2"
+version = "1.1.2"
 authors = ["damaitou"]
 edition = "2018"
 
