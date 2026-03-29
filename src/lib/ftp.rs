@@ -664,6 +664,12 @@ impl<'a> FtpStream<'a> {
                 else if facts.contains("type=dir") { FTP_DIR } 
                 else { continue };
 
+            // 对文件进行扩展名过滤（MLSD 没有 bloc 类型）
+            if ty == FTP_FILE && !self.fcc.allow_file_ext(name) {
+                warn!("{} 文件 '{}' 被扩展名过滤器排除", self.lh, name);
+                continue;
+            }
+
             if ty == FTP_FILE {
                 if let Some(history) = self.history.as_mut() {
                     //let marker = line.to_string();
@@ -721,6 +727,12 @@ impl<'a> FtpStream<'a> {
             let name = line.chars().skip(rpos).take(line.len() - rpos).collect::<String>(); //retrive filename from line
             let name: String = name.trim_matches(|c|c == '\r' || c == '\n').to_string();
             if name == "." || name == ".." { continue; }
+
+            // 对文件和 bloc 进行扩展名过滤
+            if (ty == FTP_FILE || ty == FTP_BLOC) && !self.fcc.allow_file_ext(&name) {
+                warn!("{} 文件 '{}' 被扩展名过滤器排除", self.lh, name);
+                continue;
+            }
 
             if ty == FTP_FILE {
                 if let Some(history) = self.history.as_mut() {
