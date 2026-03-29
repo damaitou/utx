@@ -858,8 +858,8 @@ impl FileRuntime {
     fn reset_and_cleanup_unfinished_file(&mut self, has_tail_packet:bool) {
         if let Some(rel_file) = &self.file_name {
             let err_msg = match has_tail_packet {
-                true => format!("丢失{}个数据包", self.utx_lost),
-                false => format!("丢失文件尾包,至少丢失{}个数据包",self.utx_lost+1),
+                true => format!("丢失{}个数据包/xxh3摘要(哈希值)校验失败", self.utx_lost),
+                false => format!("丢失文件尾包,至少丢失{}个数据包/无法校验xxh3摘要(哈希值)",self.utx_lost+1),
             };
             warn!("文件通道{},文件'{}':{}", self.fcc.channel, rel_file, err_msg);
             self.audit_f(
@@ -1175,7 +1175,7 @@ impl UtxRuntime {
                 .unwrap_or_default();
             frt.file_hash = Some(file_hash.clone());
 
-            info!("文件通道{}接收文件'{}'完毕,丢包={},xxh3={}", 
+            info!("文件通道{}接收文件'{}'完毕,丢包={},xxh3摘要(哈希值)={}", 
                 utx.channel, 
                 match frt.file_name.as_ref() { 
                     Some(s) => s.as_str(), 
