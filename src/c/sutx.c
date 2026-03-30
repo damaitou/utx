@@ -55,19 +55,22 @@ setup_rx_ring (int s, struct tpacket_req *req)	//return rx_ing
 }
 
 int
-loop(struct UtxReceiver *ur, int fd, void * token)
+loop(struct UtxReceiver *ur, int ctrl_fd, void * token)
 {
     int s = ur->socket_fd;
     struct tpacket_req *req = &ur->req;
     char *rx_ring = ur->rx_ring;
+
+    int ctrl_fd_closed = 0;  // 标记控制通道是否已关闭
 
     //struct pollfd fds[1] = { 0 };
     //struct pollfd fds[1];
     struct pollfd fds[2];
     fds[0].fd = s;
     fds[0].events = POLLIN;
-    fds[1].fd = fd;
+    fds[1].fd = ctrl_fd;
     fds[1].events = POLLIN;
+
     size_t frame_idx = 0;
     char *frame_ptr = rx_ring;
     //size_t rx_ring_size = req->tp_block_nr * req->tp_block_size;
@@ -78,37 +81,65 @@ loop(struct UtxReceiver *ur, int fd, void * token)
         struct tpacket_hdr *tphdr = (struct tpacket_hdr *) frame_ptr;
         while (!(tphdr->tp_status & TP_STATUS_USER))
         {
-            int n = poll (fds, 2, -1);
-            if (n == -1)
+            //poll的结果有两种:
+            // fds[0]有数据,则ring_buffer来数据了
+            // fds[1]有数据,则控制通道来数据了
+            int poll_result;
+            if (!ctrl_fd_closed) {
+                poll_result = poll (fds, 2, -1);
+            }
+            else {
+                poll_result = poll (fds, 1, -1); // 只监控 socket
+            }
+            if (poll_result == -1)
             {
                 perror ("poll");
-                return 0;
+                return -1;
             }
 
-            if (fds[1].revents & POLLIN) {
+            // 检查 socket 错误
+            if (fds[0].revents & (POLLERR | POLLHUP | POLLNVAL)) {
+                return -1;
+            }
+
+            // 控制通道有数据（且未关闭）
+            if (!ctrl_fd_closed && (fds[1].revents & POLLIN)) {
                 static unsigned char buf[256];
-                int nr = read(fd, buf, sizeof(buf));
+                int nr = read(ctrl_fd, buf, sizeof(buf));
                 if (nr < 0) {
+                    if (errno == EINTR) continue;
                     perror("read");
-                    return 0;
+                    close(ctrl_fd);
+                    ctrl_fd_closed = 1;
+                    // return -1;
                 }
-                ur->utx_handler(
-                    //ur->token,
-                    token,
-                    UTX_TYPE_SYS,   //utx->type, 
-                    0,              //utx->channel, 
-                    0,              //utx->seq, 
-                    0,              //utx->head, 
-                    0,              //utx->tail, 
-                    0,              //utx->check, 
-                    0,              //utx->session_id,
-                    0,              //utx->packet_opt,
-                    0,              //utx->packet_head,
-                    0,              //utx->packet_tail,
-                    buf,            //payload, 
-                    nr);            //payload_size);
+                else if (nr == 0) {
+                    // 对端关闭，标记为已关闭，不再监控
+                    printf("control fd closed by peer, continuing...\n");
+                    close(ctrl_fd);
+                    ctrl_fd_closed = 1;
+                     // 不调用 utx_handler，跳过这次处理
+                }
+                else {
+                    ur->utx_handler(
+                        //ur->token,
+                        token,
+                        UTX_TYPE_SYS,   //utx->type, 
+                        0,              //utx->channel, 
+                        0,              //utx->seq, 
+                        0,              //utx->head, 
+                        0,              //utx->tail, 
+                        0,              //utx->check, 
+                        0,              //utx->session_id,
+                        0,              //utx->packet_opt,
+                        0,              //utx->packet_head,
+                        0,              //utx->packet_tail,
+                        buf,            //payload, 
+                        nr);            //payload_size);
+                }
             }
         }
+
 
         struct sockaddr_ll *addr =
             (struct sockaddr_ll *) (frame_ptr + TPACKET_HDRLEN -

@@ -179,6 +179,8 @@ This project was originally developed in 2021 and required updates to compile wi
 6. **`src/lib/audit.rs`**: Added `mysql::prelude::*` import
 7. **`src/binprog/ftp.rs`**: Added FileExtChecker filter in `ftp_list()` and `ftp_mlsd()` functions
 8. **`src/binprog/es.rs`**: Added XXH3 file hash calculation in RX file receiving process
+9. **`src/c/sutx.c`**: Enhanced `loop()` function robustness - control channel failures no longer terminate data reception
+10. **`src/binprog/es.rs`**: Added error logging for `c_write()` failures in `timer_thread_handler()` and `ctrl_thread_handler()`
 
 ### XXH3 File Hash (RX Side)
 
@@ -188,6 +190,20 @@ Added real-time file hash calculation during file reception in `es` (RX side):
 - **Purpose**: File integrity verification
 - **Implementation**: Streaming hash updated with each packet, final hash computed on tail packet
 - **Log Output**: `INFO 文件通道{}接收文件'{}'完毕,丢包={},xxh3={}`
+
+### Robustness Improvements (2025-03)
+
+Improved error handling and fault tolerance in RX side (`es` binary):
+
+1. **Control Channel Resilience (`src/c/sutx.c`)**:
+   - Modified `loop()` function to continue data reception even when control channel (pipe) is closed by peer
+   - Added `ctrl_fd_closed` flag to track control channel state
+   - When control channel fails or is closed, the receiver continues to poll socket-only mode
+   - Prevents control thread crashes from affecting core data ferrying functionality
+
+2. **Error Logging Enhancements (`src/binprog/es.rs`)**:
+   - Added error logging for `c_write()` failures in `timer_thread_handler()` - helps diagnose pipe write issues
+   - Added error handling and logging for `c_write()` failures in `ctrl_thread_handler()` - prevents blocking on failed writes
 
 ### Build Configuration
 

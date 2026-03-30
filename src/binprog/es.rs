@@ -1500,7 +1500,10 @@ fn timer_thread_handler(v_fd: Vec<i32>) {
     loop {
         thread::sleep(Duration::from_secs(config::FLOW_STATISTICS_INTERVAL.into()));
         for fd in &v_fd {
-            util::c_write(*fd, b"timer"); //触发主进程on_sys()
+            let n = util::c_write(*fd, b"timer"); //触发主进程on_sys()
+            if n < 0 {
+                error!("timer_thread c_write failed on fd {}: {:?}", fd, std::io::Error::last_os_error());
+            }
         }
         debug!("timer_thread trigger...");
     }
@@ -1560,7 +1563,13 @@ fn ctrl_thread_handler(
             let req = format!("{} {}", action, msg.channel);
 
             for i in 0..v_fd.len() {
-                util::c_write(v_fd[i], req.as_bytes());     //触发主进程on_sys()
+                let n = util::c_write(v_fd[i], req.as_bytes());     //触发主进程on_sys()
+                if n < 0 {
+                    error!("ctrl c_write failed on fd {}: {:?}", v_fd[i], std::io::Error::last_os_error());
+                    msg.action = ThreadAction::CtrlFail;
+                    msg.object = "内部通信失败".to_string();
+                    continue;
+                }
                 let (code,info) = v_rx[i].recv().unwrap();  //等待主进程处理结果
                 msg.action = if code == "OK" { ThreadAction::CtrlOk } else { ThreadAction::CtrlFail };
                 msg.object = info;
