@@ -181,20 +181,7 @@ pub fn load_config(
             std::process::exit(-1);
         }
     };
-    match config.verify_license() {
-        Ok(is_valid) => {
-            if is_valid {
-                return config;
-            } else {
-                eprintln!("license not matched or expired");
-                std::process::exit(-1);
-            }
-        },
-        Err(e) => {
-            println!("invalid license data:{:?}", e);
-            std::process::exit(-1);
-        },
-    }
+    config
 }
 
 fn usage(prog_name: &str) {

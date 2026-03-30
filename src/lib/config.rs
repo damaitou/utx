@@ -5,7 +5,6 @@ use std::os::raw::c_int;
 use std::slice;
 use log::{error,warn,trace};
 use crate::errors::*;
-use crate::license::License;
 use base64;
 
 pub const VERSION: &'static str = "1.2.3";
@@ -929,15 +928,6 @@ impl TxConfig {
         }
 
         Ok(config)
-    }
-
-    pub fn verify_license(&self) -> Result<bool> {
-        if self.license.len() == 0 { //todo
-            return Ok(true); 
-        }
-        let lic = License::decode_license(&self.license)?;
-        let matched = lic.product == "yj_fgap_A";
-        Ok(matched)
     }
 
     fn new_physical_interface(obj: &serde_json::Value) -> Result<PhysicalInterface> {

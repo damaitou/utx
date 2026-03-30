@@ -46,6 +46,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     */
 
     //println!(r"cargo:rustc-link-lib=clamav");
+    println!(r"cargo:rustc-link-search=/usr/local/lib");
     println!(r"cargo:rustc-link-lib=magic");
 
     Ok(())
