@@ -166,7 +166,8 @@ fn ftp_thread_handler(
     };
 
     let track_peer_files =
-        ctx.kind == KIND_LISTER && cs.remote_ftp_after_treament == config::AR_KEEP;
+        (ctx.kind == KIND_LISTER && cs.remote_ftp_after_treament == config::AR_KEEP)
+        || ctx.fcc.file_ext_checker.is_some();
 
     let mut ftp: Box<dyn FileTransfer> = match is_sftp {
         true => {

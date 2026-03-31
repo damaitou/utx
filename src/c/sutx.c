@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <sys/mman.h>
 #include <poll.h>
+#include <errno.h>
 #include "sutx.h"
 
 static unsigned int rx_mtu = 1500;

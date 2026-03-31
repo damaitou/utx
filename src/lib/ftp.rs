@@ -585,7 +585,7 @@ impl<'a> FtpStream<'a> {
                 if depth > 0 && truncate_empty_directory && v.len() == 0 {
                     //TODO rmdir empty directory
                 }
-                for e in v {
+                for (ty, name, raw_line) in v {
                     match e.0 { //is_dir
                         FTP_DIR => {
                             if !e.1.starts_with(".") { //跳过首字符为'.'的目录
@@ -635,7 +635,7 @@ impl<'a> FtpStream<'a> {
         (true, offset)
     }
 
-    pub fn ftp_mlsd(&mut self, ftp_path: &str) -> Result<Vec<(u8, String)>> {
+    pub fn ftp_mlsd(&mut self, ftp_path: &str) -> Result<Vec<(u8, String, String)>> {
         let mut d_stream = self.ftp_passive()?;
         self.say(format!("MLSD {}\r\n", ftp_path).as_str())?;
         if !self.expect("150")? {
@@ -664,23 +664,8 @@ impl<'a> FtpStream<'a> {
                 else if facts.contains("type=dir") { FTP_DIR } 
                 else { continue };
 
-            // 对文件进行扩展名过滤（MLSD 没有 bloc 类型）
-            if ty == FTP_FILE && !self.fcc.allow_file_ext(name) {
-                warn!("{} 文件 '{}' 被扩展名过滤器排除", self.lh, name);
-                continue;
-            }
-
-            if ty == FTP_FILE {
-                if let Some(history) = self.history.as_mut() {
-                    //let marker = line.to_string();
-                    let marker = format!("{},{}",line,ftp_path);
-                    if history.hit_a_file(marker) {
-                        continue; //marker already in history cache, will not be processed
-                    }
-                }
-            }
-
-            v_result.push((ty, name.to_string()));
+            // 保留原始行 raw_line 用于 fetch_dir 中的 history 去重
+            v_result.push((ty, name.to_string(), line.to_string()));
         }
 
         //for 226
@@ -690,7 +675,7 @@ impl<'a> FtpStream<'a> {
         Ok(v_result)
     }
 
-    pub fn ftp_list(&mut self, ftp_path: &str) -> Result<Vec<(u8, String)>> {
+    pub fn ftp_list(&mut self, ftp_path: &str) -> Result<Vec<(u8, String, String)>> {
         let mut d_stream = self.ftp_passive()?;
         self.say(format!("LIST {}\r\n", ftp_path).as_str())?;
         if !self.expect("150")? {
@@ -728,25 +713,10 @@ impl<'a> FtpStream<'a> {
             let name: String = name.trim_matches(|c|c == '\r' || c == '\n').to_string();
             if name == "." || name == ".." { continue; }
 
-            // 对文件和 bloc 进行扩展名过滤
-            if (ty == FTP_FILE || ty == FTP_BLOC) && !self.fcc.allow_file_ext(&name) {
-                warn!("{} 文件 '{}' 被扩展名过滤器排除", self.lh, name);
-                continue;
-            }
-
-            if ty == FTP_FILE {
-                if let Some(history) = self.history.as_mut() {
-                    let marker = format!("{},{}",line,ftp_path);
-                    if history.hit_a_file(marker) {
-                        continue; //marker already in history cache, will not be processed
-                    }
-                }
-            }
-
-            v_result.push((ty, name));
+            // 保留原始行 raw_line 用于 fetch_dir 中的 history 去重
+            v_result.push((ty, name, line.to_string()));
         }
-
-        //for 226
+        
         let msg = self.hear()?;
         debug!("{} received '{}' after LIST", self.lh, msg);
 
@@ -802,16 +772,15 @@ impl<'a> FtpStream<'a> {
         Ok(true)
      }
 
-    fn filetype_not_allowed(&mut self, rel_file: &str) -> Result<()> {
-        self.ftp_mark_file_as(rel_file, ".badfileext")?;
+    fn audit_fileext_check_failed(&self, rel_file: &str) {
         if self.fcc.audit {
             let time = time::get_time();
             let far = audit::FileAuditRecord {
                 time_sec: time.sec,
                 time_nsec: time.nsec,
                 side: audit::AS_TX,
-                channel: self.fcc.channel as u8,
-                vchannel: self.fcc.vchannel,
+                channel: self.channel as u8,
+                vchannel: self.vchannel,
                 event: audit::AE_FILEEXT_CHECK,
                 result: audit::AR_ERROR,
                 result_msg: "文件扩展名不匹配".to_string(),
@@ -822,8 +791,12 @@ impl<'a> FtpStream<'a> {
             };
             audit::audit_f(&far);
         }
-        warn!("文件'{}'没有通过文件扩展名检查", rel_file);
+        warn!("{} 文件'{}'被扩展名过滤器排除", self.lh, rel_file);
+    }
 
+    fn filetype_not_allowed(&mut self, rel_file: &str) -> Result<()> {
+        self.ftp_mark_file_as(rel_file, ".badfileext")?;
+        self.audit_fileext_check_failed(rel_file);
         Ok(())
     }
 
@@ -921,23 +894,44 @@ impl<'a> FileTransfer for FtpStream<'a> {
             self.rm_dir(&rel_path)?;
         }
 
-        for e in v {
-            match e.0 {
+
+        for (ty, name, raw_line) in v {
+            match ty {
                 FTP_DIR => { //is_dir
-                    if !e.1.starts_with(".") { //跳过名称首字符为'.'的目录
-                        let dir = format!("{}/{}", rel_path, e.1);
+                    if !name.starts_with(".") { //跳过名称首字符为'.'的目录
+                        let dir = format!("{}/{}", rel_path, name);
                         self.fetch_dir(dir.as_str(), cbof, depth+1, truncate_empty_directory)?;
                     }
                 }
-                FTP_FILE => {//is_file
-                    let file = format!("{}/{}", rel_path, e.1);
+                FTP_FILE | FTP_BLOC => {
+                    let file = format!("{}/{}", rel_path, name);
+                    
+                    // 扩展名过滤
+                    if !self.fcc.allow_file_ext(&file) {
+                        // 使用 FILTERED: 前缀的 marker 避免重复审计
+                        if let Some(history) = self.history.as_mut() {
+                            let marker = format!("FILTERED:{},{}.{}", raw_line, ftp_path, ty);
+                            if !history.hit_a_file(marker) {
+                                // 第一次被过滤，记录审计
+                                self.audit_fileext_check_failed(&file);
+                            }
+                        } else {
+                            // 没有 history（server 模式），直接记录审计
+                            self.audit_fileext_check_failed(&file);
+                        }
+                        continue; // 跳过此文件
+                    }
+                    
+                    // history 去重（使用原始行）
+                    if let Some(history) = self.history.as_mut() {
+                        let marker = format!("FETCHED:{},{}.{}", raw_line, ftp_path, ty);
+                        if history.hit_a_file(marker) {
+                            continue; // marker already in history cache, will not be processed
+                        }
+                    }
+                    
                     debug!("{} lister pushing file '{}'", self.lh, file);
-                    (cbof.callback)(file.as_str(), e.0)?; //TODO
-                }
-                FTP_BLOC => {//is_bloc
-                    let file = format!("{}/{}", rel_path, e.1);
-                    debug!("{} lister pushing file '{}'", self.lh, file);
-                    (cbof.callback)(file.as_str(), e.0)?;
+                    (cbof.callback)(file.as_str(), ty)?;
                 }
                 _ => {},
             }

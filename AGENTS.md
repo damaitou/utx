@@ -177,7 +177,15 @@ This project was originally developed in 2021 and required updates to compile wi
 4. **`src/c/cutx.c`**: Added `static` to `inline` functions (`get_file_size`)
 5. **`src/c/sutx.c`**: Added `static` to `inline` functions (`guess_block_size`, `handle_frame`)
 6. **`src/lib/audit.rs`**: Added `mysql::prelude::*` import
-7. **`src/binprog/ftp.rs`**: Added FileExtChecker filter in `ftp_list()` and `ftp_mlsd()` functions
+7. **`src/lib/ftp.rs`**: Refactored file extension filtering and history tracking
+   - Moved extension filtering from `ftp_list()`/`ftp_mlsd()` to `fetch_dir()` for unified handling
+   - Changed return type of `ftp_list()`/`ftp_mlsd()` to `Vec<(u8, String, String)>` to include raw line for history tracking
+   - Added `audit_fileext_check_failed()` method for consistent audit logging
+   - Use `FILTERED:` prefix marker in history to avoid duplicate audit logs for filtered files
+   - Use `FETCHED:` prefix marker for normal file deduplication
+8. **`src/binprog/ftp_thread.rs`**: Enhanced `track_peer_files` condition
+   - Added `ctx.fcc.file_ext_checker.is_some()` to enable history tracking when file extension filtering is configured
+   - Prevents duplicate audit logs for filtered files in Client Pull mode
 8. **`src/binprog/es.rs`**: Added XXH3 file hash calculation in RX file receiving process
 9. **`src/c/sutx.c`**: Enhanced `loop()` function robustness - control channel failures no longer terminate data reception
 10. **`src/binprog/es.rs`**: Added error logging for `c_write()` failures in `timer_thread_handler()` and `ctrl_thread_handler()`

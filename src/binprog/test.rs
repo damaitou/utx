@@ -51,7 +51,7 @@ fn test_ftp()
             .map_err(|e| {eprintln!("error: {}",e); e})
             .expect("ftp_list failed");
         for v in vs {
-            println!("{} => '{}'", v.0, v.1);
+            println!("{} => '{}' (raw: {})", v.0, v.1, v.2);
         }
         println!("ftp_list ok {}, sleep 2 seconds...", _i);
         thread::sleep(Duration::from_secs(2));
